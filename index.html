@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Registro de Pagos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --primary: #1D9E75;
+    --primary-dark: #0F6E56;
+    --primary-light: #E1F5EE;
+    --primary-mid: #5DCAA5;
+    --accent: #534AB7;
+    --accent-light: #EEEDFE;
+    --danger: #E24B4A;
+    --danger-light: #FCEBEB;
+    --warning: #BA7517;
+    --warning-light: #FAEEDA;
+    --text: #2C2C2A;
+    --text-muted: #5F5E5A;
+    --text-light: #888780;
+    --border: #D3D1C7;
+    --bg: #F8F9FA;
+    --card: #FFFFFF;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* HEADER */
+  .header {
+    background: var(--primary-dark);
+    color: white;
+    padding: 1rem 1.5rem;
+    display: flex; align-items: center; gap: 1rem;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .header-logo { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+  .header-sub { font-size: 0.8rem; opacity: 0.75; }
+  .header-nav { margin-left: auto; display: flex; gap: 0.5rem; }
+  .nav-btn {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+    color: white; padding: 0.4rem 0.9rem; border-radius: 20px; cursor: pointer; font-size: 0.85rem;
+    transition: background 0.2s;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,0.25); }
+  .nav-btn.active { background: rgba(255,255,255,0.3); font-weight: 600; }
+
+  /* VIEWS */
+  .view { display: none; padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+  .view.active { display: block; }
+
+  /* SUMMARY CARDS */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .summary-card {
+    background: var(--card); border-radius: var(--radius); padding: 1.1rem 1.25rem;
+    border: 1px solid var(--border);
+  }
+  .summary-card .label { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-card .value { font-size: 1.6rem; font-weight: 700; color: var(--text); }
+  .summary-card .value.green { color: var(--primary-dark); }
+  .summary-card .value.accent { color: var(--accent); }
+
+  /* MONTH SECTION */
+  .month-section { margin-bottom: 2rem; }
+  .month-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--primary-light);
+    border: 1px solid var(--primary-mid);
+    border-radius: var(--radius);
+    padding: 0.75rem 1.2rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+  }
+  .month-title { font-weight: 600; color: var(--primary-dark); font-size: 1rem; }
+  .month-meta { font-size: 0.85rem; color: var(--primary-dark); opacity: 0.8; }
+  .month-toggle { font-size: 1rem; color: var(--primary-dark); transition: transform 0.2s; }
+  .month-toggle.open { transform: rotate(180deg); }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { background: var(--primary-dark); color: white; padding: 0.65rem 0.9rem; text-align: left; font-weight: 500; white-space: nowrap; }
+  td { padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--primary-light); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; }
+  .badge-green { background: var(--primary-light); color: var(--primary-dark); }
+  .badge-blue { background: var(--accent-light); color: var(--accent); }
+  .img-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); }
+  .no-img { width: 40px; height: 40px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: var(--text-light); text-align: center; line-height: 1.1; }
+
+  /* COMMISSION ROW */
+  .commission-row td { background: #f0faf5 !important; font-weight: 600; color: var(--primary-dark); }
+
+  /* FORM */
+  .form-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 1.5rem; max-width: 640px; margin: 0 auto; }
+  .form-title { font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+  .form-title .icon { background: var(--primary-light); color: var(--primary-dark); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+
+  .field-group { margin-bottom: 1rem; }
+  .field-label { font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
+  .field-label .req { color: var(--danger); }
+  .field-label .optional { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
+  .field-row { display: flex; gap: 0.5rem; align-items: flex-start; }
+  input[type="text"], input[type="number"], input[type="email"], input[type="tel"], select, textarea {
+    width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 0.9rem; color: var(--text); background: white;
+    transition: border-color 0.2s; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+  input.error, select.error { border-color: var(--danger); }
+  .error-msg { font-size: 0.78rem; color: var(--danger); margin-top: 0.25rem; display: none; }
+  .error-msg.show { display: block; }
+
+  .add-field-btn {
+    background: none; border: 1.5px dashed var(--primary); color: var(--primary-dark);
+    width: 36px; height: 36px; border-radius: var(--radius-sm); cursor: pointer; font-size: 1.2rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+    transition: background 0.15s;
+  }
+  .add-field-btn:hover { background: var(--primary-light); }
+  .remove-btn {
+    background: none; border: 1.5px solid var(--danger); color: var(--danger);
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 1rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 4px;
+    transition: background 0.15s;
+  }
+  .remove-btn:hover { background: var(--danger-light); }
+  .extra-field { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 0.4rem; }
+
+  .photo-area {
+    border: 2px dashed var(--border); border-radius: var(--radius); padding: 1.5rem;
+    text-align: center; cursor: pointer; transition: border-color 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .photo-area:hover { border-color: var(--primary); }
+  .photo-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .photo-area .icon { font-size: 2rem; margin-bottom: 0.4rem; color: var(--text-light); }
+  .photo-area .hint { font-size: 0.82rem; color: var(--text-muted); }
+  .photo-preview { max-width: 100%; max-height: 180px; border-radius: var(--radius-sm); margin-top: 0.75rem; }
+
+  .tutor-section { display: none; }
+  .tutor-section.show { display: block; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 0.65rem 1.4rem; border-radius: var(--radius-sm); font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem;
+  }
+  .btn-primary { background: var(--primary-dark); color: white; }
+  .btn-primary:hover { background: var(--primary); }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { background: var(--bg); }
+  .btn-accent { background: var(--accent); color: white; }
+  .btn-accent:hover { background: #3C3489; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-full { width: 100%; justify-content: center; padding: 0.8rem; }
+
+  .form-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+
+  /* NEW STUDENT BTN */
+  .new-btn-wrap { text-align: center; margin: 1.5rem 0; }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--primary-dark); color: white;
+    padding: 0.75rem 1.25rem; border-radius: var(--radius); font-size: 0.9rem; font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 9999; display: none;
+    animation: slideIn 0.25s ease;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000;
+    display: flex; align-items: center; justify-content: center; display: none;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: white; border-radius: var(--radius); padding: 1.25rem; max-width: 90vw; max-height: 90vh; overflow: auto; }
+  .modal-box img { max-width: 80vw; max-height: 80vh; border-radius: var(--radius-sm); }
+  .modal-close { position: absolute; top: 1rem; right: 1rem; background: rgba(0,0,0,0.4); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+  .empty .big { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .empty p { font-size: 0.95rem; }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    .header { flex-wrap: wrap; }
+    .header-nav { width: 100%; justify-content: center; }
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+    .form-card { padding: 1rem; }
+  }
+
+  .section-divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+  .plan-info { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">📚 Escuela Centroamericana de Idiomas</div>
+    <div class="header-sub">Sistema de registro de pagos</div>
+  </div>
+  <nav class="header-nav">
+    <button class="nav-btn active" onclick="showView('listado')">📋 Listado</button>
+    <button class="nav-btn" onclick="showView('formulario')">➕ Nuevo alumno</button>
+    <button class="nav-btn" onclick="exportExcel()">📊 Exportar Excel</button>
+  </nav>
+</div>
+
+<!-- ===== VISTA LISTADO ===== -->
+<div id="view-listado" class="view active">
+  <div class="summary-grid" id="summary-cards"></div>
+  <div id="months-container"></div>
+  <div class="new-btn-wrap">
+    <button class="btn btn-primary" onclick="showView('formulario')">➕ Ingresar nuevo alumno</button>
+  </div>
+</div>
+
+<!-- ===== VISTA FORMULARIO ===== -->
+<div id="view-formulario" class="view">
+  <div class="form-card">
+    <div class="form-title">
+      <div class="icon">📝</div>
+      Registrar pago de alumno
+    </div>
+
+    <!-- FOTO -->
+    <div class="field-group">
+      <div class="field-label">📎 Comprobante de pago <span class="req">*</span></div>
+      <div class="photo-area" id="photo-area">
+        <input type="file" accept="image/*" id="foto-input" onchange="handlePhoto(this)">
+        <div class="icon">🖼️</div>
+        <div class="hint">Haga clic para adjuntar fotografía del comprobante<br><small>JPG, PNG, WEBP — máx. 5MB</small></div>
+      </div>
+      <img id="photo-preview" class="photo-preview" style="display:none;">
+      <div class="error-msg" id="err-foto">Debe adjuntar el comprobante de pago.</div>
+    </div>
+
+    <!-- EDAD -->
+    <div class="field-group">
+      <div class="field-label">🎂 Edad del alumno <span class="req">*</span></div>
+      <input type="number" id="edad" min="4" max="99" placeholder="Ej: 12" oninput="onEdadChange()">
+      <div class="error-msg" id="err-edad">La edad mínima es 4 años para registrarse en el sistema.</div>
+    </div>
+
+    <!-- NOMBRE DEL ALUMNO -->
+    <div class="field-group">
+      <div class="field-label">👤 Nombre del alumno <span class="req">*</span></div>
+      <input type="text" id="nombre" placeholder="Nombre completo del alumno">
+      <div class="error-msg" id="err-nombre">Este campo es requerido.</div>
+    </div>
+
+    <!-- TUTOR (condicional si edad < 18) -->
+    <div class="field-group tutor-section" id="tutor-section">
+      <div class="field-label">👨‍👩‍👧 Nombre del tutor <span class="req">*</span> <span class="optional">(activado — alumno menor de edad)</span></div>
+      <input type="text" id="tutor" placeholder="Nombre completo del tutor o padre/madre">
+      <div class="error-msg" id="err-tutor">El nombre del tutor es requerido para alumnos menores de 18 años.</div>
+    </div>
+
+    <!-- TELÉFONOS -->
+    <div class="field-group">
+      <div class="field-label">📞 Teléfono <span class="req">*</span></div>
+      <div class="field-row">
+        <input type="tel" id="tel1" placeholder="Ej: 5555-1234" style="flex:1;">
+        <button class="add-field-btn" onclick="addTel()" title="Agregar segundo número">+</button>
+      </div>
+      <div id="extra-tels"></div>
+      <div class="error-msg" id="err-tel">El número de teléfono es requerido.</div>
+    </div>
+
+    <!-- CORREOS -->
+    <div class="field-group">
+      <div class="field-label">✉️ Correo electrónico <span class="req">*</span></div>
+      <div class="field-row">
+        <input type="email" id="email1" placeholder="correo@ejemplo.com" style="flex:1;">
+        <button class="add-field-btn" onclick="addEmail()" title="Agregar segundo correo">+</button>
+      </div>
+      <div id="extra-emails"></div>
+      <div class="error-msg" id="err-email">El correo electrónico es requerido.</div>
+    </div>
+
+    <!-- MONTO -->
+    <div class="field-group">
+      <div class="field-label">💰 Monto a pagar <span class="req">*</span></div>
+      <div class="field-row" style="align-items:center;">
+        <span style="font-weight:700; font-size:1.05rem; color:var(--primary-dark); padding:0.5rem 0.6rem 0.5rem 0; white-space:nowrap;">Q</span>
+        <input type="number" id="monto" min="0" step="0.01" placeholder="0.00" style="flex:1;">
+      </div>
+      <div class="error-msg" id="err-monto">Ingrese un monto válido mayor a 0.</div>
+    </div>
+
+    <!-- PLAN -->
+    <div class="field-group">
+      <div class="field-label">📦 Plan a contratar <span class="req">*</span></div>
+      <select id="plan" onchange="updatePlanInfo()">
+        <option value="">— Seleccione un plan —</option>
+        <option value="Mensual Básico">Mensual Básico</option>
+        <option value="Mensual Estándar">Mensual Estándar</option>
+        <option value="Mensual Premium">Mensual Premium</option>
+        <option value="Trimestral">Trimestral (3 meses)</option>
+        <option value="Semestral">Semestral (6 meses)</option>
+        <option value="Anual">Anual (12 meses)</option>
+        <option value="Otro">Otro</option>
+      </select>
+      <div class="plan-info" id="plan-info"></div>
+      <div class="error-msg" id="err-plan">Seleccione un plan.</div>
+    </div>
+
+    <hr class="section-divider">
+    <div class="form-actions">
+      <button class="btn btn-primary" style="flex:1;" onclick="submitForm()">✅ Ingresar</button>
+      <button class="btn btn-secondary" onclick="resetForm()">🔄 Limpiar</button>
+      <button class="btn btn-secondary" onclick="showView('listado')">← Volver al listado</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMAGEN -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+  <button class="modal-close" onclick="closeModal()">✕</button>
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <img id="modal-img" src="" alt="Comprobante">
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  STORAGE (localStorage con clave única)
+// ============================================================
+const STORAGE_KEY = 'edupagos_data_v2';
+
+function loadData() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch(e) { return []; }
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+let records = loadData();
+
+// ============================================================
+//  HELPERS
+// ============================================================
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function fmtQ(n) {
+  return 'Q ' + Number(n).toLocaleString('es-GT', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function getMonthKey(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function getMonthLabel(key) {
+  const [yr, mo] = key.split('-');
+  return `${MESES[parseInt(mo)-1]} ${yr}`;
+}
+
+function groupByMonth(data) {
+  const groups = {};
+  data.forEach(r => {
+    const k = getMonthKey(r.fecha);
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(r);
+  });
+  return groups;
+}
+
+function getNow() {
+  return new Date().toISOString();
+}
+
+// ============================================================
+//  NAVIGATION
+// ============================================================
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  const idx = ['listado','formulario'].indexOf(name);
+  if (idx >= 0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if (name === 'listado') renderListado();
+}
+
+// ============================================================
+//  FOTO
+// ============================================================
+let photoData = null;
+
+function handlePhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('⚠️ La imagen excede 5MB', 'warning'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    photoData = e.target.result;
+    const preview = document.getElementById('photo-preview');
+    preview.src = photoData;
+    preview.style.display = 'block';
+    document.getElementById('photo-area').querySelector('.icon').textContent = '✅';
+    document.getElementById('photo-area').querySelector('.hint').textContent = 'Comprobante adjuntado correctamente';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ============================================================
+//  EDAD → TUTOR
+// ============================================================
+function onEdadChange() {
+  const edad = parseInt(document.getElementById('edad').value);
+  const tutorSection = document.getElementById('tutor-section');
+  if (edad < 4 && document.getElementById('edad').value !== '') {
+    document.getElementById('err-edad').classList.add('show');
+    document.getElementById('edad').classList.add('error');
+  } else {
+    document.getElementById('err-edad').classList.remove('show');
+    document.getElementById('edad').classList.remove('error');
+  }
+  if (edad >= 4 && edad < 18) {
+    tutorSection.classList.add('show');
+  } else {
+    tutorSection.classList.remove('show');
+    document.getElementById('tutor').value = '';
+  }
+}
+
+// ============================================================
+//  TELÉFONOS EXTRA
+// ============================================================
+let telCount = 1;
+function addTel() {
+  if (telCount >= 2) { showToast('Máximo 2 números de teléfono.'); return; }
+  telCount++;
+  const wrap = document.getElementById('extra-tels');
+  const div = document.createElement('div');
+  div.className = 'extra-field';
+  div.id = 'extra-tel-' + telCount;
+  div.innerHTML = `<input type="tel" id="tel${telCount}" placeholder="Segundo número telefónico" style="flex:1;">
+    <button class="remove-btn" onclick="removeTel(${telCount})" title="Eliminar">✕</button>`;
+  wrap.appendChild(div);
+}
+function removeTel(n) {
+  document.getElementById('extra-tel-'+n).remove();
+  telCount = Math.max(1, telCount-1);
+}
+
+// ============================================================
+//  CORREOS EXTRA
+// ============================================================
+let emailCount = 1;
+function addEmail() {
+  if (emailCount >= 2) { showToast('Máximo 2 correos electrónicos.'); return; }
+  emailCount++;
+  const wrap = document.getElementById('extra-emails');
+  const div = document.createElement('div');
+  div.className = 'extra-field';
+  div.id = 'extra-email-' + emailCount;
+  div.innerHTML = `<input type="email" id="email${emailCount}" placeholder="Segundo correo electrónico" style="flex:1;">
+    <button class="remove-btn" onclick="removeEmail(${emailCount})" title="Eliminar">✕</button>`;
+  wrap.appendChild(div);
+}
+function removeEmail(n) {
+  document.getElementById('extra-email-'+n).remove();
+  emailCount = Math.max(1, emailCount-1);
+}
+
+// ============================================================
+//  PLAN INFO
+// ============================================================
+function updatePlanInfo() {
+  const plan = document.getElementById('plan').value;
+  const infoEl = document.getElementById('plan-info');
+  const infos = {
+    'Mensual Básico': 'Acceso mensual a contenidos básicos.',
+    'Mensual Estándar': 'Acceso mensual completo + soporte.',
+    'Mensual Premium': 'Acceso premium con todos los beneficios.',
+    'Trimestral': 'Pago único por 3 meses de acceso.',
+    'Semestral': 'Pago único por 6 meses — ahorro incluido.',
+    'Anual': 'Mejor precio por 12 meses completos.',
+    'Otro': 'Plan personalizado.',
+  };
+  infoEl.textContent = infos[plan] || '';
+}
+
+// ============================================================
+//  VALIDACIÓN Y ENVÍO
+// ============================================================
+function clearErrors() {
+  document.querySelectorAll('.error-msg').forEach(e => e.classList.remove('show'));
+  document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
+}
+
+function showErr(id, fieldId) {
+  document.getElementById(id).classList.add('show');
+  if (fieldId) document.getElementById(fieldId).classList.add('error');
+}
+
+function submitForm() {
+  clearErrors();
+  let valid = true;
+
+  if (!photoData) { showErr('err-foto'); valid = false; }
+
+  const edadVal = parseInt(document.getElementById('edad').value);
+  if (!document.getElementById('edad').value || edadVal < 4) {
+    showErr('err-edad','edad');
+    if (edadVal < 4 && document.getElementById('edad').value) {
+      // block entry
+    }
+    valid = false;
+  }
+
+  const nombre = document.getElementById('nombre').value.trim();
+  if (!nombre) { showErr('err-nombre','nombre'); valid = false; }
+
+  const edad = edadVal;
+  let tutor = '';
+  if (edad < 18 && edad >= 4) {
+    tutor = document.getElementById('tutor').value.trim();
+    if (!tutor) { showErr('err-tutor','tutor'); valid = false; }
+  }
+
+  const tel1 = document.getElementById('tel1').value.trim();
+  if (!tel1) { showErr('err-tel','tel1'); valid = false; }
+
+  const email1 = document.getElementById('email1').value.trim();
+  if (!email1) { showErr('err-email','email1'); valid = false; }
+
+  const montoRaw = document.getElementById('monto').value;
+  const monto = parseFloat(montoRaw);
+  if (!montoRaw || isNaN(monto) || monto <= 0) { showErr('err-monto','monto'); valid = false; }
+
+  const plan = document.getElementById('plan').value;
+  if (!plan) { showErr('err-plan','plan'); valid = false; }
+
+  if (!valid) {
+    showToast('⚠️ Corrija los campos marcados en rojo.', 'warning');
+    window.scrollTo({top: 0, behavior:'smooth'});
+    return;
+  }
+
+  // Collect extra tels & emails
+  const tels = [tel1];
+  if (document.getElementById('tel2')) {
+    const t2 = document.getElementById('tel2').value.trim();
+    if (t2) tels.push(t2);
+  }
+  const emails = [email1];
+  if (document.getElementById('email2')) {
+    const e2 = document.getElementById('email2').value.trim();
+    if (e2) emails.push(e2);
+  }
+
+  const record = {
+    id: Date.now(),
+    fecha: getNow(),
+    nombre,
+    edad,
+    tutor,
+    telefonos: tels,
+    correos: emails,
+    monto,
+    plan,
+    foto: photoData,
+  };
+
+  records.push(record);
+  saveData(records);
+
+  showToast('✅ Alumno registrado exitosamente.');
+  resetForm();
+  showView('listado');
+}
+
+// ============================================================
+//  RESET FORM
+// ============================================================
+function resetForm() {
+  photoData = null;
+  document.getElementById('foto-input').value = '';
+  document.getElementById('photo-area').querySelector('.icon').textContent = '🖼️';
+  document.getElementById('photo-area').querySelector('.hint').innerHTML = 'Haga clic para adjuntar fotografía del comprobante<br><small>JPG, PNG, WEBP — máx. 5MB</small>';
+  document.getElementById('photo-preview').style.display = 'none';
+  ['edad','nombre','tutor','tel1','email1','monto'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('plan').value = '';
+  document.getElementById('plan-info').textContent = '';
+  document.getElementById('tutor-section').classList.remove('show');
+  document.getElementById('extra-tels').innerHTML = '';
+  document.getElementById('extra-emails').innerHTML = '';
+  telCount = 1; emailCount = 1;
+  clearErrors();
+}
+
+// ============================================================
+//  RENDER LISTADO
+// ============================================================
+function renderListado() {
+  const groups = groupByMonth(records);
+  const monthKeys = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+
+  // Current month
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const currentRecords = groups[currentKey] || [];
+  const totalMes = currentRecords.reduce((s,r) => s + r.monto, 0);
+  const comisionMes = totalMes * 0.20;
+  const totalAlumnos = records.length;
+
+  // Summary cards
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="summary-card">
+      <div class="label">👥 Total alumnos registrados</div>
+      <div class="value">${totalAlumnos}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">📅 Total cobrado este mes</div>
+      <div class="value green">${fmtQ(totalMes)}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">💼 Comisión del mes (20%)</div>
+      <div class="value accent">${fmtQ(comisionMes)}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">📆 Mes en curso</div>
+      <div class="value" style="font-size:1.1rem;">${getMonthLabel(currentKey)}</div>
+    </div>
+  `;
+
+  const container = document.getElementById('months-container');
+  if (monthKeys.length === 0) {
+    container.innerHTML = `<div class="empty">
+      <div class="big">📂</div>
+      <p>No hay alumnos registrados aún.</p>
+      <p style="margin-top:0.5rem;"><button class="btn btn-primary" onclick="showView('formulario')">➕ Ingresar primer alumno</button></p>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  monthKeys.forEach(key => {
+    const items = groups[key];
+    const total = items.reduce((s,r) => s + r.monto, 0);
+    const comision = total * 0.20;
+    const label = getMonthLabel(key);
+    const isOpen = (key === currentKey);
+
+    const section = document.createElement('div');
+    section.className = 'month-section';
+    section.innerHTML = `
+      <div class="month-header" onclick="toggleMonth('body-${key}', this)">
+        <span class="month-title">📅 ${label}</span>
+        <div style="display:flex;align-items:center;gap:1rem;">
+          <span class="month-meta">${items.length} alumno${items.length!==1?'s':''} · Total: ${fmtQ(total)}</span>
+          <span class="month-toggle ${isOpen?'open':''}">▼</span>
+        </div>
+      </div>
+      <div id="body-${key}" style="${isOpen?'':'display:none'}">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Comprobante</th>
+                <th>Fecha/Hora</th>
+                <th>Nombre</th>
+                <th>Edad</th>
+                <th>Tutor</th>
+                <th>Teléfono(s)</th>
+                <th>Correo(s)</th>
+                <th>Plan</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-${key}"></tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    container.appendChild(section);
+
+    const tbody = document.getElementById('tbody-'+key);
+    items.forEach((r, idx) => {
+      const d = new Date(r.fecha);
+      const fechaStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+      const horaStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+      const fotoHtml = r.foto
+        ? `<img class="img-thumb" src="${r.foto}" alt="Comprobante" onclick="openModal('${r.id}')">`
+        : `<div class="no-img">Sin foto</div>`;
+      const tels = r.telefonos.join('<br>');
+      const emails = r.correos.join('<br>');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${idx+1}</td>
+        <td>${fotoHtml}</td>
+        <td style="white-space:nowrap;">${fechaStr}<br><small style="color:var(--text-muted)">${horaStr}</small></td>
+        <td><strong>${r.nombre}</strong></td>
+        <td><span class="badge badge-blue">${r.edad} años</span></td>
+        <td>${r.tutor || '<span style="color:var(--text-light)">—</span>'}</td>
+        <td style="font-size:0.82rem;">${tels}</td>
+        <td style="font-size:0.82rem;">${emails}</td>
+        <td><span class="badge badge-green">${r.plan}</span></td>
+        <td style="font-weight:600;white-space:nowrap;">${fmtQ(r.monto)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Total row
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'commission-row';
+    totalRow.innerHTML = `
+      <td colspan="9" style="text-align:right; padding-right:1rem;">
+        <div>Total del mes: <strong>${fmtQ(total)}</strong></div>
+        <div style="font-size:0.8rem; margin-top:2px;">Comisión 20%: <strong>${fmtQ(comision)}</strong></div>
+      </td>
+      <td><strong>${fmtQ(total)}</strong></td>
+    `;
+    tbody.appendChild(totalRow);
+  });
+}
+
+// ============================================================
+//  TOGGLE MONTH
+// ============================================================
+function toggleMonth(bodyId, header) {
+  const body = document.getElementById(bodyId);
+  const toggle = header.querySelector('.month-toggle');
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? '' : 'none';
+  toggle.classList.toggle('open', isHidden);
+}
+
+// ============================================================
+//  MODAL IMAGEN
+// ============================================================
+function openModal(id) {
+  const r = records.find(r => r.id == id);
+  if (!r || !r.foto) return;
+  document.getElementById('modal-img').src = r.foto;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+
+// ============================================================
+//  TOAST
+// ============================================================
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type === 'warning' ? 'var(--warning)' : 'var(--primary-dark)';
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+// ============================================================
+//  EXPORT EXCEL
+// ============================================================
+function exportExcel() {
+  if (records.length === 0) { showToast('⚠️ No hay datos para exportar.', 'warning'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const groups = groupByMonth(records);
+  const monthKeys = Object.keys(groups).sort();
+
+  // ─── Hoja resumen global ───
+  const summaryRows = [
+    ['SISTEMA DE REGISTRO DE PAGOS — EDUPAGOS'],
+    [`Generado el: ${new Date().toLocaleString('es-GT')}`],
+    [],
+    ['MES', 'CANTIDAD ALUMNOS', 'TOTAL COBRADO (Q)', 'COMISIÓN 20% (Q)'],
+  ];
+  let grandTotal = 0;
+  monthKeys.forEach(key => {
+    const items = groups[key];
+    const total = items.reduce((s,r) => s+r.monto, 0);
+    const comision = total * 0.20;
+    grandTotal += total;
+    summaryRows.push([getMonthLabel(key), items.length, total, comision]);
+  });
+  summaryRows.push([]);
+  summaryRows.push(['TOTAL GENERAL', records.length, grandTotal, grandTotal * 0.20]);
+
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSummary['!cols'] = [{wch:22},{wch:20},{wch:22},{wch:22}];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen General');
+
+  // ─── Una hoja por mes ───
+  monthKeys.forEach(key => {
+    const items = groups[key];
+    const label = getMonthLabel(key);
+    const rows = [
+      [`ALUMNOS REGISTRADOS — ${label.toUpperCase()}`],
+      [],
+      ['#','Fecha','Hora','Nombre Alumno','Edad','Nombre Tutor','Teléfonos','Correos','Plan','Monto (Q)'],
+    ];
+    let total = 0;
+    items.forEach((r, idx) => {
+      const d = new Date(r.fecha);
+      const fecha = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+      const hora = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+      rows.push([
+        idx+1,
+        fecha,
+        hora,
+        r.nombre,
+        r.edad,
+        r.tutor || '—',
+        r.telefonos.join(' / '),
+        r.correos.join(' / '),
+        r.plan,
+        r.monto,
+      ]);
+      total += r.monto;
+    });
+    rows.push([]);
+    rows.push(['','','','','','','','','TOTAL DEL MES:', total]);
+    rows.push(['','','','','','','','','COMISIÓN 20%:', total * 0.20]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:4},{wch:12},{wch:8},{wch:24},{wch:6},{wch:22},{wch:18},{wch:26},{wch:18},{wch:14}];
+
+    // Nombre de hoja truncado a 31 chars (límite Excel)
+    const sheetName = label.substring(0,31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  XLSX.writeFile(wb, `EduPagos_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('📊 Archivo Excel generado y descargado.');
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+renderListado();
+</script>
+</body>
+</html>
